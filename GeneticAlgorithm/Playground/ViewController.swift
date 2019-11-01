@@ -12,10 +12,14 @@ import SnapKit
 class PlaygroundViewController: UIViewController {
     // MARK: - Variables
     var creatures: [Creature] = []
-    var eaten: [Bool] = []
+    var eatenCreatures: [Bool] = []
+    var eatenFood: [Bool] = []
     var foods: [Food] = []
-    private let initialCount = 1
-    private let foodCount = 100
+    private let initialCount = 10
+    private var foodCount = 500
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .darkContent
+    }
     
     // MARK: - Outlets
     var avarageSpeedLabel: UILabel = {
@@ -42,9 +46,20 @@ class PlaygroundViewController: UIViewController {
     
     var numberOfCreaturesLabel: UILabel = {
         let label = UILabel()
-        label.numberOfLines = 1
+        label.numberOfLines = 0
         label.textColor = .black
         label.font = UIFont.systemFont(ofSize: 20, weight: .bold)
+        label.text = ""
+        
+        return label
+    }()
+    
+    var dayLabel: UILabel = {
+        let label = UILabel()
+        label.numberOfLines = 0
+        label.textColor = .black
+        label.font = UIFont.systemFont(ofSize: 30, weight: .bold)
+        label.textAlignment = .center
         label.text = ""
         
         return label
@@ -63,13 +78,13 @@ class PlaygroundViewController: UIViewController {
         for index in 0..<foods.count {
             foods[index].model.removeFromSuperview()
         }
-        eaten.removeAll()
+        eatenFood.removeAll()
         foods.removeAll()
         
         for _ in 0..<foodCount {
             let food = Food.random(bounds: view.bounds.size)
             foods.append(food)
-            eaten.append(false)
+            eatenFood.append(false)
             view.insertSubview(food.model, at: 0)
         }
     }
@@ -78,6 +93,7 @@ class PlaygroundViewController: UIViewController {
         for _ in 0..<initialCount {
             let creature = Creature.random(bounds: view.bounds.size)
             creatures.append(creature)
+            eatenCreatures.append(false)
             view.addSubview(creature.model)
         }
         
@@ -87,24 +103,42 @@ class PlaygroundViewController: UIViewController {
     }
     
     private func moveCreatures() {
-        creatures.forEach { creature in
+        for index in 0..<creatures.count {
             UIView.animate(withDuration: 0.2) {
-                creature.move(foods: self.foods, eaten: &self.eaten)
+                self.creatures[index].move(foods: self.foods, eatenFood: &self.eatenFood, creatures: self.creatures, eatenCreaures: &self.eatenCreatures, id: index)
             }
         }
     }
     
     private func clearEatenFood() {
-        for index in 0..<eaten.count {
-            foods[index].model.isHidden = eaten[index]
+        for index in 0..<eatenFood.count {
+            foods[index].model.isHidden = eatenFood[index]
         }
+    }
+    
+    private func killEatenCreatures() {
+        let newCreatures = creatures.enumerated().compactMap { (index, creature) -> Creature? in
+            if eatenCreatures[index] {
+                self.creatures[index].model.removeFromSuperview()
+                return nil
+            }
+            return creature
+        }
+        creatures = newCreatures
+        
+        eatenCreatures = creatures.map { _ in false }
     }
     
     // MARK: - Markup
     private func markup() {
         view.backgroundColor = .white
         
-        [avarageSpeedLabel, avarageSearchAreaLabel, numberOfCreaturesLabel].forEach { view.addSubview($0) }
+        [dayLabel, avarageSpeedLabel, avarageSearchAreaLabel, numberOfCreaturesLabel].forEach { view.addSubview($0) }
+        
+        dayLabel.snp.makeConstraints() {
+            $0.top.equalTo(view.snp.topMargin)
+            $0.left.right.equalToSuperview()
+        }
         
         avarageSpeedLabel.snp.makeConstraints() {
             $0.bottom.equalTo(view.snp.bottomMargin)
@@ -131,6 +165,7 @@ extension PlaygroundViewController: LifetimerDelegate {
     func tick() {
         moveCreatures()
         clearEatenFood()
+        killEatenCreatures()
     }
     
     func newDay() {
@@ -158,7 +193,8 @@ extension PlaygroundViewController: LifetimerDelegate {
             creatures[index].model.removeFromSuperview()
         }
         
-        creatures = newCreatures
+        creatures = newCreatures.sorted { $0.eatArea < $1.eatArea }
+        eatenCreatures = creatures.map { _ in false }
         
         for index in 0..<creatures.count {
             creatures[index].position = .random(bounds: view.bounds.size)
@@ -183,6 +219,8 @@ extension PlaygroundViewController: LifetimerDelegate {
         
         avarageSpeedLabel.text = "speed\nmin: \(String(format: "%.2f", minimumSpeed))\navg:\(String(format: "%.2f", avarageSpeed))\nmax:\(String(format: "%.2f", maximumSpeed))"
         avarageSearchAreaLabel.text = "size\nmin: \(String(format: "%.2f", minimumSize))\navg:\(String(format: "%.2f", avarageSize))\nmax:\(String(format: "%.2f", maximumSize))"
-        numberOfCreaturesLabel.text = "\(creatures.count)"
+        numberOfCreaturesLabel.text = "population:\n\(creatures.count)"
+        dayLabel.text = "Day \(Lifetimer.shared.dayNumber)"
+        foodCount = max(foodCount - 10, 100)
     }
 }

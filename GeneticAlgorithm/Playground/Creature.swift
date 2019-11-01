@@ -11,14 +11,14 @@ import UIKit
 
 class Creature {
     // MARK: - Variables
-    var speed: CGFloat = 20
+    var speed: CGFloat = 10
     var eatCount = 0
-    var searchArea: CGFloat = 50 {
+    var searchArea: CGFloat = 60 {
         didSet {
-            eatArea = self.searchArea / 2.0
+            eatArea = self.searchArea / 3.0
         }
     }
-    var eatArea: CGFloat = 25 {
+    var eatArea: CGFloat = 20 {
         didSet {
             model.frame.size = CGSize(width: self.eatArea, height: self.eatArea)
             model.layer.cornerRadius = self.eatArea / 2.0
@@ -32,22 +32,54 @@ class Creature {
     
     lazy var model: UIView = {
         let view = UIView()
-        view.frame.size = CGSize(width: 25, height: 25)
-        view.layer.cornerRadius = 12.5
+        view.frame.size = CGSize(width: 20, height: 20)
+        view.layer.cornerRadius = 10
         view.backgroundColor = .random
         
         return view
     }()
     
     // MARK: - Methods
-    func move(foods: [Food], eaten: inout [Bool]) {
+    func move(foods: [Food], eatenFood: inout [Bool], creatures: [Creature], eatenCreaures: inout [Bool], id: Int) {
+        if eatenCreaures[id] { return }
+        var creatureAround: Creature?
+        var leastDistanceToCreature = CGFloat(MAXFLOAT)
+        for index in 0..<creatures.count {
+            if index == id { continue }
+            if creatures[index].eatArea * 4 > eatArea { continue }
+            if eatenCreaures[index] { continue }
+            let distance = creatures[index].position.distance(self.position)
+            if distance < eatArea / 2.0 {
+                self.eat(creatures: creatures, eatenCreatures: &eatenCreaures, index: index)
+                return
+            } else if distance < searchArea && distance < leastDistanceToCreature {
+                creatureAround = creatures[index]
+                leastDistanceToCreature = distance
+            }
+        }
+        
+        if let creature = creatureAround {
+            var dx = creature.position.x - position.x
+            var dy = creature.position.y - position.y
+            let distance = CGPoint.zero.distance(CGPoint(x: dx, y: dy))
+            dx = dx / distance * speed
+            dy = dy / distance * speed
+            
+            if distance <= speed {
+                position = creature.position
+            } else {
+                position = CGPoint(x: position.x + dx, y: position.y + dy)
+            }
+            return
+        }
+        
         var foodAround: Food?
         var leastDistance = CGFloat(MAXFLOAT)
         for index in 0..<foods.count {
-            guard !eaten[index] else { continue }
+            guard !eatenFood[index] else { continue }
             let distance = foods[index].position.distance(self.position)
             if distance < eatArea / 2.0 {
-                self.eat(foods: foods, eaten: &eaten, index: index)
+                self.eat(foods: foods, eatenFood: &eatenFood, index: index)
                 return
             } else if distance < searchArea && distance < leastDistance {
                 foodAround = foods[index]
@@ -67,21 +99,27 @@ class Creature {
             } else {
                 position = CGPoint(x: position.x + dx, y: position.y + dy)
             }
-        } else {
-            var dx = CGFloat.random(in: -100...100)
-            var dy = CGFloat.random(in: -100...100)
-            let distance = CGPoint.zero.distance(CGPoint(x: dx, y: dy))
-            dx = dx / distance * speed
-            dy = dy / distance * speed
-            
-            position = CGPoint(x: position.x + dx, y: position.y + dy)
+            return
         }
+        
+        
+        var dx = CGFloat.random(in: -100...100)
+        var dy = CGFloat.random(in: -100...100)
+        let distance = CGPoint.zero.distance(CGPoint(x: dx, y: dy))
+        dx = dx / distance * speed
+        dy = dy / distance * speed
+        
+        position = CGPoint(x: position.x + dx, y: position.y + dy)
     }
     
-    func eat(foods: [Food], eaten: inout [Bool], index: Int) {
-        eaten[index] = true
+    func eat(creatures: [Creature], eatenCreatures: inout [Bool], index: Int) {
+        eatenCreatures[index] = true
+        eatCount += creatures[index].eatCount + 2
+    }
+    
+    func eat(foods: [Food], eatenFood: inout [Bool], index: Int) {
+        eatenFood[index] = true
         eatCount += 1
-//        print("\(self.position) \(foods[index].position) \(self.eatArea)")
     }
     
     func mutated(mutation: Bool = .random()) -> Creature {
